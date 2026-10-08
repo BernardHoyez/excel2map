@@ -1,28 +1,65 @@
 # excel2map
 
-PWA statique permettant d'afficher sur une carte Leaflet/OpenStreetMap des lieux provenant d'un fichier XLS ou XLSX.
+PWA (Progressive Web App) qui importe un fichier Excel (`.xls` / `.xlsx`) contenant des lieux et les affiche sur une carte OpenStreetMap (Leaflet).
 
-## Format du fichier Excel
+## Format Excel attendu
 
-Deux colonnes :
-1. intitulé du lieu
-2. latitude,longitude
+| Colonne 1          | Colonne 2              |
+|--------------------|------------------------|
+| Intitulé du lieu   | latitude,longitude     |
 
 Exemple :
 
-| Lieu | Coordonnées |
-|---|---|
-| Le Havre | 49.4944,0.1079 |
-| Fécamp | 49.7579,0.3749 |
+| Tour Eiffel        | 48.8584,2.2945         |
+| Notre-Dame         | 48.8530,2.3499         |
 
-La première ligne peut contenir les en-têtes.
+- Une ligne d'en-tête optionnelle (détectée automatiquement si le premier cellule contient « lieu », « nom », « name », etc.) est ignorée.
+- Les coordonnées peuvent être séparées par `,` ou `;`.
+- Les lignes invalides sont ignorées avec un compteur dans le statut.
 
-## Utilisation
+## Fonctionnalités
 
-Ouvrir `index.html` via un serveur web (GitHub Pages, Cloudflare Pages, etc.), charger le fichier Excel, puis exporter les points en `points.json`.
+- Import Excel (SheetJS / xlsx)
+- Affichage des points sur carte OSM (Leaflet) avec épingle + popup (intitulé)
+- Liste cliquable des lieux (recentre la carte)
+- Export des points au format JSON (`excel2map-points.json`)
+- PWA installable (manifest + service worker)
+- Service worker avec **brise-caches** (suppression des anciens caches à l’activation)
+- Placeholders d’icônes : `icon192.png` et `icon512.png`
 
-La bibliothèque XLSX et Leaflet sont chargées depuis leurs CDN ; la lecture du fichier Excel et l'export JSON se font localement dans le navigateur.
+## Fichiers
 
-## Publication GitHub Pages
+```
+excel2map/
+├── index.html
+├── styles.css
+├── app.js
+├── sw.js
+├── manifest.json
+├── icon192.png
+├── icon512.png
+└── README.md
+```
 
-Décompresser l'archive et déposer son contenu dans le dossier publié du dépôt. Aucun build n'est nécessaire.
+## Utilisation locale
+
+Ouvrir via un serveur HTTP (les service workers exigent un contexte sécurisé ou localhost) :
+
+```bash
+npx serve .
+# ou
+python3 -m http.server 8080
+```
+
+Puis ouvrir `http://localhost:8080` dans le navigateur.
+
+## Dépendances CDN
+
+- Leaflet 1.9.4
+- SheetJS (xlsx) 0.20.3
+
+Aucune build step : pure HTML/CSS/JS.
+
+## Licence
+
+Usage libre.
