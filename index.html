@@ -2,21 +2,18 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <meta name="theme-color" content="#2c7a4b">
-  <meta name="description" content="excel2map — Importez un Excel de lieux et affichez-les sur une carte OpenStreetMap">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#3388ff">
+  <meta name="description" content="excel2map - Affichez vos lieux Excel sur une carte OSM">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="excel2map">
   <link rel="manifest" href="manifest.json">
-  <link rel="icon" type="image/png" sizes="192x192" href="icon192.png">
-  <link rel="icon" type="image/png" sizes="512x512" href="icon512.png">
-  <link rel="apple-touch-icon" href="icon192.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon192.png">
+  <link rel="apple-touch-icon" href="icons/icon192.png">
   <title>excel2map</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
-        crossorigin="">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <header>
@@ -25,35 +22,45 @@
   </header>
 
   <main>
-    <section id="controls" class="panel">
-      <label class="file-label" for="fileInput">
-        <span class="btn">Choisir un fichier Excel (.xls / .xlsx)</span>
-        <input type="file" id="fileInput" accept=".xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
-      </label>
-      <p id="fileName" class="file-name"></p>
-      <div class="actions">
-        <button id="btnExport" class="btn secondary" disabled>Exporter JSON</button>
-        <button id="btnClear" class="btn secondary" disabled>Effacer</button>
+    <section class="controls">
+      <div class="file-input-wrapper">
+        <label for="excelFile" class="btn btn-primary">
+          📂 Charger un fichier Excel (.xls / .xlsx)
+        </label>
+        <input type="file" id="excelFile" accept=".xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>
       </div>
-      <p id="status" class="status"></p>
+      <p class="hint">Colonne 1 : intitulé · Colonne 2 : latitude,longitude</p>
+
+      <div class="export-buttons" id="exportButtons" hidden>
+        <button type="button" class="btn btn-secondary" id="btnJson">⬇️ JSON</button>
+        <button type="button" class="btn btn-secondary" id="btnGpx">⬇️ GPX</button>
+        <button type="button" class="btn btn-secondary" id="btnKml">⬇️ KML</button>
+        <button type="button" class="btn btn-outline" id="btnClear">🗑️ Effacer</button>
+      </div>
+
+      <div id="status" class="status" aria-live="polite"></div>
     </section>
 
-    <section id="map" class="map-container" aria-label="Carte des lieux"></section>
-
-    <section id="listPanel" class="panel list-panel hidden">
-      <h2>Lieux chargés <span id="countBadge" class="badge">0</span></h2>
-      <ul id="placesList"></ul>
+    <section class="map-section">
+      <div id="map"></div>
     </section>
   </main>
 
   <footer>
-    <small>PWA · Leaflet · OpenStreetMap · SheetJS</small>
+    <small>PWA offline-ready · Leaflet + OSM · SheetJS</small>
   </footer>
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
-          crossorigin=""></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
   <script src="app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+          .then(reg => console.log('SW registered', reg.scope))
+          .catch(err => console.warn('SW registration failed', err));
+      });
+    }
+  </script>
 </body>
 </html>

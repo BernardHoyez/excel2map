@@ -1,237 +1,235 @@
-/* excel2map — PWA */
 (function () {
-  "use strict";
+  'use strict';
 
-  const fileInput = document.getElementById("fileInput");
-  const fileNameEl = document.getElementById("fileName");
-  const statusEl = document.getElementById("status");
-  const btnExport = document.getElementById("btnExport");
-  const btnClear = document.getElementById("btnClear");
-  const placesList = document.getElementById("placesList");
-  const listPanel = document.getElementById("listPanel");
-  const countBadge = document.getElementById("countBadge");
+  const map = L.map('map', {
+    zoomControl: true,
+    attributionControl: true
+  }).setView([46.603354, 1.888334], 6); // France center by default
 
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+  }).addTo(map);
+
+  let markersLayer = L.layerGroup().addTo(map);
   let places = []; // { name, lat, lon }
-  let markers = [];
-  let map = null;
 
-  // ── Map init ──────────────────────────────────────────────
-  function initMap() {
-    map = L.map("map", {
-      center: [46.6, 2.4], // France approx
-      zoom: 5,
-      zoomControl: true,
-    });
+  const excelInput = document.getElementById('excelFile');
+  const statusEl = document.getElementById('status');
+  const exportButtons = document.getElementById('exportButtons');
+  const btnJson = document.getElementById('btnJson');
+  const btnGpx = document.getElementById('btnGpx');
+  const btnKml = document.getElementById('btnKml');
+  const btnClear = document.getElementById('btnClear');
 
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution:
-        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-      maxZoom: 19,
-    }).addTo(map);
-  }
-
-  // ── Status helpers ────────────────────────────────────────
   function setStatus(msg, type) {
-    statusEl.textContent = msg || "";
-    statusEl.className = "status" + (type ? " " + type : "");
+    statusEl.textContent = msg;
+    statusEl.className = 'status' + (type ? ' ' + type : '');
   }
 
-  // ── Parse lat,lon cell ────────────────────────────────────
-  function parseCoords(raw) {
-    if (raw == null) return null;
-    const s = String(raw).trim().replace(/\s+/g, "");
+  function parseLatLon(str) {
+    if (typeof str !== 'string') str = String(str || '');
+    str = str.trim().replace(/\s+/g, '');
     // Accept "lat,lon" or "lat;lon" or "lat lon"
-    const parts = s.split(/[,;]/);
+    const parts = str.split(/[,;\s]+/).filter(Boolean);
     if (parts.length < 2) return null;
-    const lat = parseFloat(parts[0].replace(",", "."));
-    const lon = parseFloat(parts[1].replace(",", "."));
+    const lat = parseFloat(parts[0].replace(',', '.'));
+    const lon = parseFloat(parts[1].replace(',', '.'));
     if (isNaN(lat) || isNaN(lon)) return null;
     if (lat < -90 || lat > 90 || lon < -180 || lon > 180) return null;
     return { lat, lon };
   }
 
-  // ── Read Excel ────────────────────────────────────────────
-  async function handleFile(file) {
-    if (!file) return;
-    fileNameEl.textContent = file.name;
-    setStatus("Lecture en cours…");
-
-    try {
-      const buffer = await file.arrayBuffer();
-      const wb = XLSX.read(buffer, { type: "array" });
-      const sheetName = wb.SheetNames[0];
-      const sheet = wb.Sheets[sheetName];
-      const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
-
-      if (!rows.length) {
-        setStatus("Feuille vide.", "error");
-        return;
-      }
-
-      // Detect header row (optional): if first cell looks like text header
-      let start = 0;
-      const firstCell = String(rows[0][0] || "").toLowerCase();
-      if (
-        firstCell.includes("lieu") ||
-        firstCell.includes("nom") ||
-        firstCell.includes("name") ||
-        firstCell.includes("place") ||
-        firstCell.includes("intitulé")
-      ) {
-        start = 1;
-      }
-
-      const parsed = [];
-      const errors = [];
-
-      for (let i = start; i < rows.length; i++) {
-        const row = rows[i];
-        if (!row || row.length < 2) continue;
-        const name = String(row[0] || "").trim();
-        if (!name) continue;
-        const coords = parseCoords(row[1]);
-        if (!coords) {
-          errors.push(`Ligne ${i + 1} : coordonnées invalides (« ${row[1]} »)`);
-          continue;
-        }
-        parsed.push({ name, lat: coords.lat, lon: coords.lon });
-      }
-
-      if (!parsed.length) {
-        setStatus(
-          "Aucun lieu valide trouvé. Attendu : colonne 1 = intitulé, colonne 2 = latitude,longitude",
-          "error"
-        );
-        return;
-      }
-
-      places = parsed;
-      renderPlaces();
-      setStatus(
-        `${places.length} lieu(x) chargé(s)` +
-          (errors.length ? ` · ${errors.length} ligne(s) ignorée(s)` : ""),
-        "ok"
-      );
-      btnExport.disabled = false;
-      btnClear.disabled = false;
-    } catch (err) {
-      console.error(err);
-      setStatus("Erreur de lecture du fichier : " + (err.message || err), "error");
-    }
+  function clearMap() {
+    markersLayer.clearLayers();
+    places = [];
+    exportButtons.hidden = true;
+    setStatus('');
   }
 
-  // ── Render markers + list ─────────────────────────────────
-  function clearMarkers() {
-    markers.forEach((m) => map.removeLayer(m));
-    markers = [];
-  }
-
-  function renderPlaces() {
-    clearMarkers();
-    placesList.innerHTML = "";
-
-    if (!places.length) {
-      listPanel.classList.add("hidden");
-      countBadge.textContent = "0";
-      return;
-    }
-
-    listPanel.classList.remove("hidden");
-    countBadge.textContent = String(places.length);
+  function addMarkers() {
+    markersLayer.clearLayers();
+    if (!places.length) return;
 
     const bounds = [];
-
-    places.forEach((p, idx) => {
-      const marker = L.marker([p.lat, p.lon])
-        .addTo(map)
-        .bindPopup(`<strong>${escapeHtml(p.name)}</strong><br>${p.lat}, ${p.lon}`);
-      markers.push(marker);
+    places.forEach((p) => {
+      const marker = L.marker([p.lat, p.lon]);
+      marker.bindPopup(`<strong>${escapeHtml(p.name)}</strong><br>${p.lat.toFixed(6)}, ${p.lon.toFixed(6)}`);
+      marker.bindTooltip(p.name, { permanent: false, direction: 'top' });
+      markersLayer.addLayer(marker);
       bounds.push([p.lat, p.lon]);
-
-      const li = document.createElement("li");
-      li.innerHTML = `<span>${escapeHtml(p.name)}</span><span class="coords">${p.lat.toFixed(5)}, ${p.lon.toFixed(5)}</span>`;
-      li.addEventListener("click", () => {
-        map.setView([p.lat, p.lon], Math.max(map.getZoom(), 14));
-        marker.openPopup();
-      });
-      placesList.appendChild(li);
     });
 
     if (bounds.length === 1) {
       map.setView(bounds[0], 14);
-    } else if (bounds.length > 1) {
-      map.fitBounds(bounds, { padding: [40, 40] });
+    } else {
+      map.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
     }
   }
 
-  function escapeHtml(str) {
-    return String(str)
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;");
+  function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
   }
 
-  // ── Export JSON ───────────────────────────────────────────
-  function exportJSON() {
+  function processWorkbook(wb) {
+    const firstSheetName = wb.SheetNames[0];
+    const sheet = wb.Sheets[firstSheetName];
+    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+
+    if (!rows.length) {
+      setStatus('Feuille vide.', 'error');
+      return;
+    }
+
+    const parsed = [];
+    let skipped = 0;
+
+    // Skip potential header if first row looks like text labels
+    let start = 0;
+    if (rows.length > 1) {
+      const first = rows[0];
+      const c0 = String(first[0] || '').toLowerCase();
+      const c1 = String(first[1] || '').toLowerCase();
+      if (
+        (c0.includes('lieu') || c0.includes('nom') || c0.includes('name') || c0.includes('intitulé') || c0.includes('titre') || c0.includes('label')) &&
+        (c1.includes('lat') || c1.includes('coord') || c1.includes('gps') || c1.includes('position'))
+      ) {
+        start = 1;
+      }
+    }
+
+    for (let i = start; i < rows.length; i++) {
+      const row = rows[i];
+      if (!row || row.length < 2) {
+        skipped++;
+        continue;
+      }
+      const name = String(row[0] || '').trim();
+      if (!name) {
+        skipped++;
+        continue;
+      }
+      const coords = parseLatLon(row[1]);
+      if (!coords) {
+        skipped++;
+        continue;
+      }
+      parsed.push({ name, lat: coords.lat, lon: coords.lon });
+    }
+
+    if (!parsed.length) {
+      setStatus('Aucun point valide trouvé. Vérifiez le format (col1 = intitulé, col2 = lat,lon).', 'error');
+      return;
+    }
+
+    places = parsed;
+    addMarkers();
+    exportButtons.hidden = false;
+    let msg = `${places.length} lieu${places.length > 1 ? 'x' : ''} affiché${places.length > 1 ? 's' : ''}`;
+    if (skipped) msg += ` (${skipped} ligne${skipped > 1 ? 's' : ''} ignorée${skipped > 1 ? 's' : ''})`;
+    setStatus(msg, 'success');
+  }
+
+  excelInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setStatus('Lecture en cours…');
+    clearMap();
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const data = new Uint8Array(evt.target.result);
+        const wb = XLSX.read(data, { type: 'array' });
+        processWorkbook(wb);
+      } catch (err) {
+        console.error(err);
+        setStatus('Erreur de lecture du fichier Excel.', 'error');
+      }
+    };
+    reader.onerror = () => setStatus('Impossible de lire le fichier.', 'error');
+    reader.readAsArrayBuffer(file);
+
+    // Reset input so same file can be re-selected
+    excelInput.value = '';
+  });
+
+  btnClear.addEventListener('click', () => {
+    clearMap();
+    setStatus('Carte effacée.');
+  });
+
+  function download(filename, content, mime) {
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  }
+
+  btnJson.addEventListener('click', () => {
     if (!places.length) return;
     const data = places.map((p) => ({
       name: p.name,
       latitude: p.lat,
-      longitude: p.lon,
+      longitude: p.lon
     }));
-    const blob = new Blob([JSON.stringify(data, null, 2)], {
-      type: "application/json",
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "excel2map-points.json";
-    a.click();
-    URL.revokeObjectURL(url);
-    setStatus("JSON exporté.", "ok");
-  }
-
-  // ── Clear ─────────────────────────────────────────────────
-  function clearAll() {
-    places = [];
-    clearMarkers();
-    placesList.innerHTML = "";
-    listPanel.classList.add("hidden");
-    countBadge.textContent = "0";
-    fileInput.value = "";
-    fileNameEl.textContent = "";
-    setStatus("");
-    btnExport.disabled = true;
-    btnClear.disabled = true;
-    map.setView([46.6, 2.4], 5);
-  }
-
-  // ── Events ────────────────────────────────────────────────
-  fileInput.addEventListener("change", (e) => {
-    const f = e.target.files && e.target.files[0];
-    if (f) handleFile(f);
+    download('excel2map-points.json', JSON.stringify(data, null, 2), 'application/json');
   });
 
-  btnExport.addEventListener("click", exportJSON);
-  btnClear.addEventListener("click", clearAll);
-
-  // ── Service Worker (cache-busting) ────────────────────────
-  if ("serviceWorker" in navigator) {
-    window.addEventListener("load", () => {
-      // Bust cache with build timestamp / version
-      const SW_VERSION = "excel2map-v1-" + Date.now();
-      navigator.serviceWorker
-        .register("./sw.js?v=" + encodeURIComponent(SW_VERSION))
-        .then((reg) => {
-          // Force update check
-          reg.update();
-          console.log("[excel2map] SW registered", reg.scope);
-        })
-        .catch((err) => console.warn("[excel2map] SW registration failed", err));
+  btnGpx.addEventListener('click', () => {
+    if (!places.length) return;
+    let gpx = `<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="excel2map" xmlns="http://www.topografix.com/GPX/1/1">
+  <metadata>
+    <name>excel2map export</name>
+    <time>${new Date().toISOString()}</time>
+  </metadata>
+`;
+    places.forEach((p) => {
+      gpx += `  <wpt lat="${p.lat}" lon="${p.lon}">
+    <name>${escapeXml(p.name)}</name>
+  </wpt>
+`;
     });
-  }
+    gpx += '</gpx>';
+    download('excel2map-points.gpx', gpx, 'application/gpx+xml');
+  });
 
-  // Boot
-  initMap();
+  btnKml.addEventListener('click', () => {
+    if (!places.length) return;
+    let kml = `<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>excel2map export</name>
+`;
+    places.forEach((p) => {
+      kml += `    <Placemark>
+      <name>${escapeXml(p.name)}</name>
+      <Point>
+        <coordinates>${p.lon},${p.lat},0</coordinates>
+      </Point>
+    </Placemark>
+`;
+    });
+    kml += `  </Document>
+</kml>`;
+    download('excel2map-points.kml', kml, 'application/vnd.google-earth.kml+xml');
+  });
+
+  function escapeXml(str) {
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&apos;');
+  }
 })();

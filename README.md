@@ -1,64 +1,54 @@
 # excel2map
 
-PWA (Progressive Web App) qui importe un fichier Excel (`.xls` / `.xlsx`) contenant des lieux et les affiche sur une carte OpenStreetMap (Leaflet).
+PWA permettant de charger un fichier Excel (XLS / XLSX) contenant des lieux et de les afficher sur une carte OpenStreetMap (Leaflet).
 
-## Format Excel attendu
+## Format d'entrée
 
-| Colonne 1          | Colonne 2              |
-|--------------------|------------------------|
-| Intitulé du lieu   | latitude,longitude     |
+| Colonne 1       | Colonne 2              |
+|-----------------|------------------------|
+| Intitulé du lieu| latitude,longitude     |
 
 Exemple :
 
-| Tour Eiffel        | 48.8584,2.2945         |
-| Notre-Dame         | 48.8530,2.3499         |
+```
+Tour Eiffel	48.858370,2.294481
+Colisée	41.890210,12.492231
+```
 
-- Une ligne d'en-tête optionnelle (détectée automatiquement si le premier cellule contient « lieu », « nom », « name », etc.) est ignorée.
-- Les coordonnées peuvent être séparées par `,` ou `;`.
-- Les lignes invalides sont ignorées avec un compteur dans le statut.
+- La première ligne peut être un en-tête (détecté automatiquement).
+- Les coordonnées acceptent `,` ou `;` ou espace comme séparateur.
+- Les lignes invalides sont ignorées.
 
 ## Fonctionnalités
 
-- Import Excel (SheetJS / xlsx)
-- Affichage des points sur carte OSM (Leaflet) avec épingle + popup (intitulé)
-- Liste cliquable des lieux (recentre la carte)
-- Export des points au format JSON (`excel2map-points.json`)
+- Affichage des points avec épingles et intitulés (popup + tooltip)
+- Zoom automatique sur l'ensemble des points
+- Export :
+  - **JSON** – tableau d'objets `{ name, latitude, longitude }`
+  - **GPX** – waypoints
+  - **KML** – placemarks
 - PWA installable (manifest + service worker)
-- Service worker avec **brise-caches** (suppression des anciens caches à l’activation)
-- Placeholders d’icônes : `icon192.png` et `icon512.png`
+- Service worker avec cache versionné (cache-busting)
 
-## Fichiers
+## Utilisation
 
-```
-excel2map/
-├── index.html
-├── styles.css
-├── app.js
-├── sw.js
-├── manifest.json
-├── icon192.png
-├── icon512.png
-└── README.md
-```
+1. Ouvrir `index.html` (ou servir le dossier via un serveur HTTP pour le SW).
+2. Charger un fichier Excel.
+3. Les points apparaissent sur la carte.
+4. Exporter au format souhaité.
 
-## Utilisation locale
+## Icônes
 
-Ouvrir via un serveur HTTP (les service workers exigent un contexte sécurisé ou localhost) :
+Placeholders fournis :
+- `icons/icon192.png`
+- `icons/icon512.png`
 
-```bash
-npx serve .
-# ou
-python3 -m http.server 8080
-```
+Remplacez-les par vos propres icônes si besoin.
 
-Puis ouvrir `http://localhost:8080` dans le navigateur.
-
-## Dépendances CDN
+## Dépendances (CDN)
 
 - Leaflet 1.9.4
 - SheetJS (xlsx) 0.20.3
-
-Aucune build step : pure HTML/CSS/JS.
 
 ## Licence
 
